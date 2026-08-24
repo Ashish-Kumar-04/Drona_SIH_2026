@@ -902,7 +902,13 @@ def search_scout_talent(
     athletes = query.all()
     results = []
 
+    # Exclude dummy/test generated accounts
+    DUMMY_KEYWORDS = ("test", "cert athlete", "manual athlete", "coaching athlete", "camera athlete", "legacy")
+
     for athlete in athletes:
+        name_lower = (athlete.name or "").lower()
+        if any(kw in name_lower for kw in DUMMY_KEYWORDS) or athlete.athlete_id.startswith("ATH-LEGACY"):
+            continue
         perf = db.query(Performance).filter(Performance.athlete_id == athlete.athlete_id).first()
         if min_overall_index is not None:
             if not perf or perf.overall_index < min_overall_index:

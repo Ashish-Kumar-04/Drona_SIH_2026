@@ -16,11 +16,17 @@ import { ArrowLeft, Download } from 'lucide-react';
 
 export default function App() {
   const [lang, setLang] = useState('en');
+  const [theme, setTheme] = useState(() => localStorage.getItem('app_theme') || 'dark');
   const [accountType, setAccountType] = useState(null); // 'athlete' | 'official' | null
   const [athlete, setAthlete] = useState(null);
   const [official, setOfficial] = useState(null);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('app_theme', theme);
+  }, [theme]);
 
   // Athlete workflow: 'profile' | 'select_test' | 'guidance' | 'assessment' | 'manual_entry' | 'results'
   const [athleteStep, setAthleteStep] = useState('profile');
@@ -146,9 +152,29 @@ export default function App() {
     );
   }
 
-  // ─── Not logged in → show Auth ───
-  if (!accountType) {
-    return <AuthScreen onAuthenticated={handleAuthenticated} t={t} />;
+  // ─── Not logged in or profile unresolved → show Auth with Navbar & Footer ───
+  if (!accountType || (accountType === 'athlete' && !athlete)) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Navbar
+          user={null}
+          onLogout={handleLogout}
+          lang={lang} setLang={setLang}
+          theme={theme} setTheme={setTheme}
+          t={t}
+        />
+        <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 20px' }}>
+          <AuthScreen onAuthenticated={handleAuthenticated} t={t} />
+        </main>
+        <footer style={{
+          textAlign: 'center', padding: '18px', fontSize: '0.72rem',
+          color: 'var(--text-dim)', borderTop: '1px solid var(--border-glass)',
+          background: 'var(--bg-footer)'
+        }}>
+          National Sports Talent Assessment Platform • SIH 25073 • Powered by AI + MediaPipe
+        </footer>
+      </div>
+    );
   }
 
   // ─── Official / Scout → Talent Discovery Dashboard ───
@@ -159,7 +185,9 @@ export default function App() {
           user={official ? { name: official.name, id: official.official_id } : null}
           roleLabel={t.roles.scout}
           onLogout={handleLogout}
-          lang={lang} setLang={setLang} t={t}
+          lang={lang} setLang={setLang}
+          theme={theme} setTheme={setTheme}
+          t={t}
         />
         <main style={{ flex: 1, padding: '24px 20px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
           <ScoutDashboard official={official} t={t} lang={lang} />
@@ -167,7 +195,7 @@ export default function App() {
         <footer style={{
           textAlign: 'center', padding: '18px', fontSize: '0.72rem',
           color: 'var(--text-dim)', borderTop: '1px solid var(--border-glass)',
-          background: 'rgba(7, 10, 18, 0.9)'
+          background: 'var(--bg-footer)'
         }}>
           National Sports Talent Assessment Platform • SIH 25073 • Powered by AI + MediaPipe
         </footer>
@@ -175,15 +203,10 @@ export default function App() {
     );
   }
 
-  // ─── Athlete not yet resolved (edge) → back to Auth ───
-  if (!athlete) {
-    return <AuthScreen onAuthenticated={handleAuthenticated} t={t} />;
-  }
-
   // ─── Logged in → Athlete Dashboard ───
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar athlete={athlete} onLogout={handleLogout} lang={lang} setLang={setLang} t={t} />
+      <Navbar athlete={athlete} onLogout={handleLogout} lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} t={t} />
 
       <main style={{ flex: 1, padding: '24px 20px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
         {/* Back button when in test flow */}
@@ -292,7 +315,7 @@ export default function App() {
       <footer style={{
         textAlign: 'center', padding: '18px', fontSize: '0.72rem',
         color: 'var(--text-dim)', borderTop: '1px solid var(--border-glass)',
-        background: 'rgba(7, 10, 18, 0.9)'
+        background: 'var(--bg-footer)'
       }}>
         National Sports Talent Assessment Platform • SIH 25073 • Powered by AI + MediaPipe
       </footer>

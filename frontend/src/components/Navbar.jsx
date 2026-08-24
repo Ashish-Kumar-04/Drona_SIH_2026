@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Activity, LogOut, User, WifiOff, UploadCloud } from 'lucide-react';
+import { Globe, Activity, LogOut, User, WifiOff, UploadCloud, Palette } from 'lucide-react';
 import { queueCount } from '../utils/offlineQueue';
 
-export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLang, t }) {
+export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLang, theme = 'dark', setTheme, t }) {
   // Normalize whichever account is signed in (athlete or official) into {name, id}.
   const acct = user || (athlete ? { name: athlete.name, id: athlete.athlete_id } : null);
 
@@ -38,7 +38,7 @@ export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLa
       justifyContent: 'space-between',
       padding: '14px 24px',
       borderBottom: '1px solid var(--border-glass)',
-      background: 'rgba(7, 10, 18, 0.88)',
+      background: 'var(--bg-navbar)',
       backdropFilter: 'blur(16px)',
       position: 'sticky',
       top: 0,
@@ -46,14 +46,16 @@ export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLa
     }}>
       {/* Brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{
-          width: '40px', height: '40px', borderRadius: '12px',
-          background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 18px rgba(0, 242, 254, 0.4)'
-        }}>
-          <Activity size={22} color="#070a12" strokeWidth={2.5} />
-        </div>
+        <img 
+          src="/logo.jpg" 
+          alt="Drona Logo" 
+          style={{
+            width: '42px', height: '42px', borderRadius: '10px',
+            objectFit: 'cover',
+            boxShadow: '0 0 14px rgba(0, 242, 254, 0.4)',
+            border: '1px solid rgba(0, 242, 254, 0.3)'
+          }} 
+        />
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
@@ -118,10 +120,38 @@ export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLa
           </div>
         )}
 
+        {/* Theme Switcher */}
+        {setTheme && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '5px',
+            background: 'var(--bg-glass)',
+            border: '1px solid var(--border-glass)',
+            borderRadius: 'var(--radius-md)',
+            padding: '4px 8px'
+          }}>
+            <Palette size={14} color="var(--primary)" />
+            <select
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+              title="Select Theme"
+              style={{
+                background: 'transparent', border: 'none', color: 'var(--text-main)',
+                fontFamily: 'var(--font-display)', fontWeight: 600,
+                fontSize: '0.8rem', cursor: 'pointer', outline: 'none'
+              }}>
+              <option value="dark" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>🌙 Dark Glass</option>
+              <option value="light-olympic" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>☀️ Olympic Clean</option>
+              <option value="light-platinum" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>🌿 Platinum Emerald</option>
+              <option value="light-arena" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>🌅 Sunset Arena</option>
+              <option value="light-nordic" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>❄️ Nordic Frost</option>
+            </select>
+          </div>
+        )}
+
         {/* Language */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '5px',
-          background: 'rgba(255, 255, 255, 0.04)',
+          background: 'var(--bg-glass)',
           border: '1px solid var(--border-glass)',
           borderRadius: 'var(--radius-md)',
           padding: '4px 8px'
@@ -133,8 +163,8 @@ export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLa
               fontFamily: 'var(--font-display)', fontWeight: 600,
               fontSize: '0.8rem', cursor: 'pointer', outline: 'none'
             }}>
-            <option value="en" style={{ background: '#090e1a' }}>EN</option>
-            <option value="hi" style={{ background: '#090e1a' }}>हिं</option>
+            <option value="en" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>EN</option>
+            <option value="hi" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>हिं</option>
           </select>
         </div>
 

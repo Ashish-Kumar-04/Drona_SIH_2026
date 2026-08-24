@@ -140,9 +140,9 @@ export default function ScoutDashboard({ official, t, lang }) {
           <div>
             <label style={labelStyle}>{t.scout.filterState}</label>
             <select value={filters.state} onChange={(e) => setFilters({ ...filters, state: e.target.value })}
-              style={{ ...inputStyle, background: '#0d1424' }}>
-              <option value="">{t.scout.anyState}</option>
-              {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+              style={{ ...inputStyle, background: 'var(--bg-glass)' }}>
+              <option value="" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>{t.scout.anyState}</option>
+              {INDIAN_STATES.map(s => <option key={s} value={s} style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>{s}</option>)}
             </select>
           </div>
           <div>
@@ -158,10 +158,10 @@ export default function ScoutDashboard({ official, t, lang }) {
           <div>
             <label style={labelStyle}>{t.scout.filterTest}</label>
             <select value={filters.test_type} onChange={(e) => setFilters({ ...filters, test_type: e.target.value })}
-              style={{ ...inputStyle, background: '#0d1424' }}>
-              <option value="">{t.scout.anyTest}</option>
+              style={{ ...inputStyle, background: 'var(--bg-glass)' }}>
+              <option value="" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>{t.scout.anyTest}</option>
               {TESTS.map(test => (
-                <option key={test.id} value={test.id}>{t.tests[test.titleKey]}</option>
+                <option key={test.id} value={test.id} style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>{t.tests[test.titleKey]}</option>
               ))}
             </select>
           </div>

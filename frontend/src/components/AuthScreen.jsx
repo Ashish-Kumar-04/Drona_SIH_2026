@@ -17,13 +17,13 @@ const inputStyle = {
   width: '100%',
   padding: '12px 14px',
   borderRadius: 'var(--radius-md)',
-  background: 'rgba(255, 255, 255, 0.05)',
+  background: 'var(--bg-input)',
   border: '1px solid var(--border-glass)',
   color: 'var(--text-main)',
   fontSize: '0.92rem',
   fontFamily: 'var(--font-body)',
   outline: 'none',
-  transition: 'border-color 0.2s ease'
+  transition: 'border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease'
 };
 
 const labelStyle = {
@@ -259,16 +259,16 @@ export default function AuthScreen({ onAuthenticated, t }) {
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <div style={{
-            width: '60px', height: '60px', borderRadius: '50%',
-            background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: '14px', boxShadow: '0 0 30px rgba(0, 242, 254, 0.4)'
-          }}>
-            {mode === 'login' && <LogIn size={28} color="#070a12" />}
-            {mode === 'register' && <UserPlus size={28} color="#070a12" />}
-            {(mode === 'forgot' || mode === 'otp_verify') && <KeyRound size={28} color="#070a12" />}
-          </div>
+          <img 
+            src="/logo.jpg" 
+            alt="Drona Sports Logo" 
+            style={{
+              width: '72px', height: '72px', borderRadius: '18px',
+              objectFit: 'cover', marginBottom: '12px',
+              boxShadow: '0 0 24px rgba(0, 242, 254, 0.4)',
+              border: '1px solid rgba(0, 242, 254, 0.3)'
+            }} 
+          />
           <h2 style={{ fontSize: '1.45rem', marginBottom: '4px' }}>
             {mode === 'login' && (isOfficial ? 'Scout / Official Login' : 'Athlete Login')}
             {mode === 'register' && (isOfficial ? 'Register Official Account' : 'New Athlete Registration')}
@@ -442,10 +442,10 @@ export default function AuthScreen({ onAuthenticated, t }) {
                 <label style={labelStyle}>Gender *</label>
                 <select value={regForm.category}
                   onChange={(e) => setRegForm({ ...regForm, category: e.target.value })}
-                  style={{ ...inputStyle, background: '#0d1424' }}>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="General">General</option>
+                  style={{ ...inputStyle, background: 'var(--bg-input)' }}>
+                  <option value="Male" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>Male</option>
+                  <option value="Female" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>Female</option>
+                  <option value="General" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>General</option>
                 </select>
               </div>
             </div>
@@ -455,9 +455,9 @@ export default function AuthScreen({ onAuthenticated, t }) {
                 <label style={labelStyle}>State *</label>
                 <select required value={regForm.state}
                   onChange={(e) => setRegForm({ ...regForm, state: e.target.value })}
-                  style={{ ...inputStyle, background: '#0d1424' }}>
-                  <option value="">Select State</option>
-                  {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  style={{ ...inputStyle, background: 'var(--bg-input)' }}>
+                  <option value="" style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>Select State</option>
+                  {INDIAN_STATES.map(s => <option key={s} value={s} style={{ background: 'var(--bg-select-option)', color: 'var(--text-main)' }}>{s}</option>)}
                 </select>
               </div>
               <div>

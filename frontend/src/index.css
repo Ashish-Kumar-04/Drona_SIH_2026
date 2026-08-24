@@ -5,6 +5,8 @@
 
 :root {
   --bg-dark: #070a12;
+  --bg-navbar: rgba(7, 10, 18, 0.88);
+  --bg-footer: rgba(7, 10, 18, 0.95);
   --bg-card: rgba(13, 20, 36, 0.75);
   --bg-card-hover: rgba(19, 30, 54, 0.85);
   --bg-glass: rgba(255, 255, 255, 0.04);
@@ -23,6 +25,7 @@
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-dim: #64748b;
+  --btn-primary-text: #070a12;
 
   --font-display: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
@@ -37,6 +40,142 @@
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35);
   --shadow-glow: 0 0 24px rgba(0, 242, 254, 0.2);
   --shadow-green-glow: 0 0 24px rgba(0, 245, 160, 0.2);
+
+  --bg-select-option: #0d1424;
+  --bg-input: rgba(255, 255, 255, 0.05);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   4 DISTINCT VIBRANT LIGHT THEMES (Olympic, Emerald, Sunset, Nordic)
+   ───────────────────────────────────────────────────────────── */
+
+/* 1. Daylight Snow / Olympic Clean (Pristine White & Royal Blue) */
+[data-theme="light-olympic"] {
+  --bg-dark: #f8fafc;
+  --bg-navbar: rgba(255, 255, 255, 0.95);
+  --bg-footer: #e2e8f0;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --bg-glass: rgba(241, 245, 249, 0.9);
+  --border-glass: #cbd5e1;
+  --border-glow: rgba(37, 99, 235, 0.4);
+
+  --primary: #2563eb;
+  --primary-glow: rgba(37, 99, 235, 0.25);
+  --secondary: #0284c7;
+  --accent-green: #059669;
+  --accent-green-glow: rgba(5, 150, 105, 0.2);
+  --accent-amber: #d97706;
+  --accent-red: #dc2626;
+  --accent-purple: #7c3aed;
+
+  --text-main: #0f172a;
+  --text-muted: #334155;
+  --text-dim: #64748b;
+  --btn-primary-text: #ffffff;
+
+  --shadow-sm: 0 4px 20px rgba(15, 23, 42, 0.08);
+  --shadow-glow: 0 0 20px rgba(37, 99, 235, 0.15);
+  --bg-select-option: #ffffff;
+  --bg-input: #f1f5f9;
+}
+
+/* 2. Platinum Emerald / SAI Green (Mint Platinum & Forest Emerald) */
+[data-theme="light-platinum"] {
+  --bg-dark: #e6f4ea;
+  --bg-navbar: rgba(255, 255, 255, 0.95);
+  --bg-footer: #d1fae5;
+  --bg-card: #ffffff;
+  --bg-card-hover: #ecfdf5;
+  --bg-glass: rgba(209, 250, 229, 0.7);
+  --border-glass: #a7f3d0;
+  --border-glow: rgba(5, 150, 105, 0.4);
+
+  --primary: #059669;
+  --primary-glow: rgba(5, 150, 105, 0.25);
+  --secondary: #0d9488;
+  --accent-green: #10b981;
+  --accent-green-glow: rgba(16, 185, 129, 0.2);
+  --accent-amber: #b45309;
+  --accent-red: #e11d48;
+  --accent-purple: #6d28d9;
+
+  --text-main: #064e3b;
+  --text-muted: #047857;
+  --text-dim: #10b981;
+  --btn-primary-text: #ffffff;
+
+  --shadow-sm: 0 4px 20px rgba(6, 78, 59, 0.08);
+  --shadow-glow: 0 0 20px rgba(5, 150, 105, 0.15);
+  --bg-select-option: #ffffff;
+  --bg-input: #f0fdf4;
+}
+
+/* 3. Sunset Arena / Sports Flame (Warm Peach & Sun Coral) */
+[data-theme="light-arena"] {
+  --bg-dark: #fff4ed;
+  --bg-navbar: rgba(255, 255, 255, 0.95);
+  --bg-footer: #ffedd5;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fff7ed;
+  --bg-glass: rgba(255, 237, 213, 0.7);
+  --border-glass: #fed7aa;
+  --border-glow: rgba(234, 88, 12, 0.4);
+
+  --primary: #ea580c;
+  --primary-glow: rgba(234, 88, 12, 0.25);
+  --secondary: #d97706;
+  --accent-green: #16a34a;
+  --accent-amber: #c2410c;
+  --accent-red: #dc2626;
+  --accent-purple: #7e22ce;
+
+  --text-main: #431407;
+  --text-muted: #7c2d12;
+  --text-dim: #c2410c;
+  --btn-primary-text: #ffffff;
+
+  --shadow-sm: 0 4px 20px rgba(67, 20, 7, 0.08);
+  --shadow-glow: 0 0 20px rgba(234, 88, 12, 0.15);
+  --bg-select-option: #ffffff;
+  --bg-input: #fff7ed;
+}
+
+/* 4. Royal Violet / Velvet Frost (Pastel Lilac & Royal Purple) */
+[data-theme="light-nordic"] {
+  --bg-dark: #f5f3ff;
+  --bg-navbar: rgba(255, 255, 255, 0.95);
+  --bg-footer: #ede9fe;
+  --bg-card: #ffffff;
+  --bg-card-hover: #faf5ff;
+  --bg-glass: rgba(237, 233, 254, 0.7);
+  --border-glass: #ddd6fe;
+  --border-glow: rgba(124, 58, 237, 0.4);
+
+  --primary: #7c3aed;
+  --primary-glow: rgba(124, 58, 237, 0.25);
+  --secondary: #4f46e5;
+  --accent-green: #059669;
+  --accent-amber: #d97706;
+  --accent-red: #e11d48;
+  --accent-purple: #9333ea;
+
+  --text-main: #2e1065;
+  --text-muted: #5b21b6;
+  --text-dim: #7c3aed;
+  --btn-primary-text: #ffffff;
+
+  --shadow-sm: 0 4px 20px rgba(46, 16, 101, 0.08);
+  --shadow-glow: 0 0 20px rgba(124, 58, 237, 0.15);
+  --bg-select-option: #ffffff;
+  --bg-input: #faf5ff;
+}
+
+/* Body gradient adaptation for light themes */
+[data-theme^="light"] body {
+  background-image: 
+    radial-gradient(circle at 15% 15%, var(--primary-glow) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(2, 132, 199, 0.06) 0%, transparent 45%);
 }
 
 * {
@@ -56,6 +195,7 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Typography */
@@ -114,37 +254,39 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-  color: #070a12;
-  box-shadow: 0 4px 16px rgba(0, 242, 254, 0.35);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  color: var(--btn-primary-text);
+  box-shadow: 0 4px 16px var(--primary-glow);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 6px 24px rgba(0, 242, 254, 0.5);
+  box-shadow: 0 6px 24px var(--primary-glow);
   transform: translateY(-1px);
 }
 
 .btn-accent {
-  background: linear-gradient(135deg, #00f5a0 0%, #00d2ff 100%);
-  color: #070a12;
-  box-shadow: 0 4px 16px rgba(0, 245, 160, 0.3);
+  background: linear-gradient(135deg, var(--accent-green) 0%, var(--primary) 100%);
+  color: var(--btn-primary-text);
+  box-shadow: 0 4px 16px var(--accent-green-glow);
 }
 
 .btn-accent:hover {
-  box-shadow: 0 6px 24px rgba(0, 245, 160, 0.45);
+  box-shadow: 0 6px 24px var(--accent-green-glow);
   transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-glass);
   color: var(--text-main);
   border: 1px solid var(--border-glass);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--bg-card-hover);
+  border-color: var(--border-glow);
 }
+
+
 
 .btn-danger {
   background: linear-gradient(135deg, #ff385c 0%, #e60049 100%);
