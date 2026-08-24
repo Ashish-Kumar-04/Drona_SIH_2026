@@ -11,7 +11,7 @@ export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLa
   const [pending, setPending] = useState(0);
 
   useEffect(() => {
-    const refresh = () => { queueCount().then(setPending).catch(() => {}); };
+    const refresh = () => { queueCount().then(setPending).catch(() => { }); };
     const goOnline = () => { setOnline(true); refresh(); };
     const goOffline = () => setOnline(false);
     window.addEventListener('online', goOnline);
@@ -57,9 +57,9 @@ export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLa
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
-              SAI TalentAI
+              Drona-Sports Talent Assessment Platform
             </h2>
-            <span className="badge badge-cyan" style={{ fontSize: '0.6rem' }}>SIH 25073</span>
+
           </div>
           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
             {t.tagline}
