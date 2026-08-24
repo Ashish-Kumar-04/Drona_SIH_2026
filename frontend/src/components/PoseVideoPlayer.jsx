@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 
 // MediaPipe 33 standard joint skeleton connections
 const POSE_CONNECTIONS = [
@@ -24,11 +24,46 @@ const POSE_CONNECTIONS = [
   ['NOSE', 'RIGHT_SHOULDER']
 ];
 
+// Binary-search the landmark frame whose capture timestamp is nearest to the
+// given video time. Frames get dropped whenever pose detection fails, so the
+// array is NOT evenly spaced in time — matching on array position instead of
+// real timestamps makes the skeleton drift ahead of the video.
+function findFrameIndexForTime(timeline, t) {
+  const n = timeline.length;
+  if (n === 0) return 0;
+  if (t <= timeline[0]) return 0;
+  if (t >= timeline[n - 1]) return n - 1;
+
+  let lo = 0;
+  let hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (timeline[mid] <= t) lo = mid;
+    else hi = mid - 1;
+  }
+  // lo = last frame at or before t; pick whichever neighbour is closer in time.
+  const next = lo + 1;
+  if (next < n && timeline[next] - t < t - timeline[lo]) return next;
+  return lo;
+}
+
 export default function PoseVideoPlayer({ videoSrc, framesLandmarks, fps = 30, testType, activeMetric }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrameIdx, setCurrentFrameIdx] = useState(0);
+
+  // Monotonic timeline of real capture timestamps (seconds) for each landmark
+  // frame. Prefer the backend-provided timestamp, then frame_index/fps, then
+  // positional index (legacy/demo data without timestamps).
+  const timeline = useMemo(() => {
+    if (!framesLandmarks || framesLandmarks.length === 0) return [];
+    return framesLandmarks.map((f, i) => {
+      if (f && typeof f.timestamp === 'number') return f.timestamp;
+      if (f && typeof f.frame_index === 'number') return f.frame_index / fps;
+      return i / fps;
+    });
+  }, [framesLandmarks, fps]);
 
   // Sync canvas pose drawing with video playback time
   useEffect(() => {
@@ -46,11 +81,10 @@ export default function PoseVideoPlayer({ videoSrc, framesLandmarks, fps = 30, t
         ctx.clearRect(0, 0, width, height);
 
         if (framesLandmarks && framesLandmarks.length > 0) {
-          const currentTime = video.currentTime;
-          const targetIdx = Math.min(
-            framesLandmarks.length - 1,
-            Math.floor(currentTime * fps)
-          );
+          // Sync the overlay to the actual playback time, matching on real frame
+          // timestamps so the skeleton stays locked to the video and never races
+          // ahead of it (even when detection dropped frames during analysis).
+          const targetIdx = findFrameIndexForTime(timeline, video.currentTime);
           setCurrentFrameIdx(targetIdx);
 
           const frameData = framesLandmarks[targetIdx];
@@ -112,7 +146,7 @@ export default function PoseVideoPlayer({ videoSrc, framesLandmarks, fps = 30, t
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [framesLandmarks, fps]);
+  }, [framesLandmarks, timeline]);
 
   return (
     <div style={{

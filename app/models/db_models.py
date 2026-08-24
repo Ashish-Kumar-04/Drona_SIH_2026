@@ -69,7 +69,23 @@ class Performance(Base):
     strength_score = Column(Float, nullable=False, default=0.0)
     power_score = Column(Float, nullable=False, default=0.0)
     endurance_score = Column(Float, nullable=False, default=0.0)
+    flexibility_score = Column(Float, nullable=False, default=0.0)         # sit & reach domain
+    body_composition_score = Column(Float, nullable=False, default=0.0)    # BMI-based indicator
     overall_index = Column(Float, nullable=False, default=0.0) # Athletic Performance Index
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     athlete = relationship("Athlete", back_populates="performance")
+
+
+class Official(Base):
+    """Scout / SAI official account — separate from athletes, with its own login."""
+    __tablename__ = "officials"
+
+    official_id = Column(String(50), primary_key=True, index=True)  # e.g. OFF-2026-000123
+    name = Column(String(100), nullable=False)
+    email = Column(String(120), nullable=False, unique=True, index=True)  # login identifier
+    organization = Column(String(120), nullable=True)  # e.g. Sports Authority of India
+    phone = Column(String(20), nullable=True)
+    password_hash = Column(String(255), nullable=False)  # bcrypt hash
+    created_at = Column(DateTime, default=datetime.utcnow)
+

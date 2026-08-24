@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, Activity, Award, CheckCircle2, Zap } from 'lucide-react';
+import CoachingFeedback from './CoachingFeedback';
 
 export default function LiveMetricsHUD({ assessmentResult, testType, t }) {
   if (!assessmentResult) return null;
@@ -13,12 +14,14 @@ export default function LiveMetricsHUD({ assessmentResult, testType, t }) {
     status,
     benchmark_status,
     benchmark_source,
+    coaching = null,
     details = {}
   } = assessmentResult;
 
   const isSitup = testType === 'sit_up';
   const isJump = testType === 'vertical_jump';
   const isShuttle = testType === 'shuttle_run';
+  const isBroad = testType === 'broad_jump';
 
   return (
     <div className="glass-panel" style={{ padding: '20px', marginTop: '20px' }}>
@@ -49,7 +52,7 @@ export default function LiveMetricsHUD({ assessmentResult, testType, t }) {
           textAlign: 'center'
         }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-            {isSitup ? t.metrics.validReps : isJump ? t.metrics.jumpHeight : t.metrics.totalTime}
+            {isSitup ? t.metrics.validReps : isJump ? t.metrics.jumpHeight : isBroad ? 'Jump Distance' : t.metrics.totalTime}
           </div>
           <div className="mono" style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--primary)' }}>
             {raw_score} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{unit}</span>
@@ -89,13 +92,13 @@ export default function LiveMetricsHUD({ assessmentResult, testType, t }) {
           textAlign: 'center'
         }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-            {isSitup ? t.metrics.formScore : isJump ? 'Flight Time' : 'Turnaround Speed'}
+            {isSitup ? t.metrics.formScore : (isJump || isBroad) ? 'Flight Time' : 'Turnaround Speed'}
           </div>
           <div className="mono" style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ffffff' }}>
-            {isSitup ? `${details.form_score || 95}%` : isJump ? `${details.flight_time_sec || 0.45}s` : `${details.peak_velocity_norm || 1.2}`}
+            {isSitup ? `${details.form_score || 95}%` : (isJump || isBroad) ? `${details.flight_time_sec || 0.45}s` : `${details.peak_velocity_norm || 1.2}`}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-            {isSitup ? 'Posture & Cadence' : isJump ? 'Kinematic equation' : 'Boundary check passed'}
+            {isSitup ? 'Posture & Cadence' : isJump ? 'Kinematic equation' : isBroad ? 'Horizontal COM displacement' : 'Boundary check passed'}
           </div>
         </div>
 
@@ -136,6 +139,9 @@ export default function LiveMetricsHUD({ assessmentResult, testType, t }) {
         </div>
         <span style={{ color: 'var(--text-dim)' }}>Peer group: Age & Category Norms</span>
       </div>
+
+      {/* Corrective coaching — what to fix and how to improve */}
+      <CoachingFeedback coaching={coaching || details.coaching} t={t} />
     </div>
   );
 }

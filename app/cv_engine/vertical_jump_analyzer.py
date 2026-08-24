@@ -4,7 +4,7 @@ Implements Section 11 of SIH 25073 specification using real kinematic equations 
 """
 
 import numpy as np
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 from app.core.config import settings
 from app.cv_engine.pose_detector import PoseDetector
 
@@ -129,7 +129,7 @@ class VerticalJumpAnalyzer:
         else:
             estimated_jump_height_cm = pixel_height_cm
 
-        # Clamping realistic human vertical jump bounds [10 cm, 130 cm]
+        # Clamp to realistic human standing-vertical-jump bounds [0 cm, 120 cm].
         estimated_jump_height_cm = round(float(np.clip(estimated_jump_height_cm, 0.0, 120.0)), 1)
 
         # Confidence Score calculation

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserPlus, LogIn, KeyRound, ArrowLeft, ShieldCheck, Eye, EyeOff, Send } from 'lucide-react';
+import { UserPlus, LogIn, KeyRound, ArrowLeft, ShieldCheck, Eye, EyeOff, Send, User, Building2 } from 'lucide-react';
 import { api } from '../utils/api';
 
 const INDIAN_STATES = [
@@ -37,6 +37,7 @@ const labelStyle = {
 
 export default function AuthScreen({ onAuthenticated, t }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot' | 'otp_verify'
+  const [accountType, setAccountType] = useState('athlete'); // 'athlete' | 'official'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -45,14 +46,21 @@ export default function AuthScreen({ onAuthenticated, t }) {
   // Login state
   const [loginId, setLoginId] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [officialEmail, setOfficialEmail] = useState('');
 
-  // Registration state
+  // Athlete registration state
   const [regForm, setRegForm] = useState({
     name: '', age: '', category: 'Male', state: '', district: '',
     school: '', sports_interest: '', height_cm: '', weight_kg: '',
     phone: '', email: '', password: '', confirmPassword: ''
   });
   const [registeredId, setRegisteredId] = useState(null);
+
+  // Official registration state
+  const [offForm, setOffForm] = useState({
+    name: '', email: '', organization: '', phone: '',
+    password: '', confirmPassword: '', signup_key: ''
+  });
 
   // Forgot password state
   const [resetAthleteId, setResetAthleteId] = useState('');
@@ -62,20 +70,31 @@ export default function AuthScreen({ onAuthenticated, t }) {
   const [otpSentData, setOtpSentData] = useState(null);
 
   const clearMessages = () => { setError(null); setSuccess(null); };
+  const switchAccountType = (type) => { setAccountType(type); clearMessages(); };
 
   // ─── LOGIN ───
   const handleLogin = async (e) => {
     e.preventDefault();
     clearMessages();
-    if (!loginId.trim() || !loginPassword) {
-      setError('Please enter your Athlete ID and password.');
-      return;
-    }
     setLoading(true);
     try {
-      const athlete = await api.loginAthlete(loginId.trim(), loginPassword);
-      localStorage.setItem('athlete_id', athlete.athlete_id);
-      onAuthenticated(athlete);
+      if (accountType === 'official') {
+        if (!officialEmail.trim() || !loginPassword) {
+          setError('Please enter your official email and password.');
+          setLoading(false);
+          return;
+        }
+        const data = await api.loginOfficial(officialEmail.trim(), loginPassword);
+        onAuthenticated(data.official, 'official');
+      } else {
+        if (!loginId.trim() || !loginPassword) {
+          setError('Please enter your Athlete ID and password.');
+          setLoading(false);
+          return;
+        }
+        const data = await api.loginAthlete(loginId.trim(), loginPassword);
+        onAuthenticated(data.athlete, 'athlete');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -83,7 +102,7 @@ export default function AuthScreen({ onAuthenticated, t }) {
     }
   };
 
-  // ─── REGISTER ───
+  // ─── ATHLETE REGISTER ───
   const handleRegister = async (e) => {
     e.preventDefault();
     clearMessages();
@@ -115,12 +134,46 @@ export default function AuthScreen({ onAuthenticated, t }) {
         email: regForm.email.trim() || null,
         password: regForm.password
       };
-      const athlete = await api.registerAthlete(payload);
-      setRegisteredId(athlete.athlete_id);
-      setSuccess(`Registration successful! Your Athlete ID is: ${athlete.athlete_id}`);
-      // Auto-login after registration
-      localStorage.setItem('athlete_id', athlete.athlete_id);
-      setTimeout(() => onAuthenticated(athlete), 2500);
+      const data = await api.registerAthlete(payload);
+      setRegisteredId(data.athlete.athlete_id);
+      setSuccess(`Registration successful! Your Athlete ID is: ${data.athlete.athlete_id}`);
+      setTimeout(() => onAuthenticated(data.athlete, 'athlete'), 2500);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── OFFICIAL REGISTER ───
+  const handleOfficialRegister = async (e) => {
+    e.preventDefault();
+    clearMessages();
+    if (!offForm.name || !offForm.email || !offForm.password || !offForm.signup_key) {
+      setError('Please fill name, email, password and the official enrolment key.');
+      return;
+    }
+    if (offForm.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (offForm.password !== offForm.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = {
+        name: offForm.name.trim(),
+        email: offForm.email.trim(),
+        organization: offForm.organization.trim() || null,
+        phone: offForm.phone.trim() || null,
+        password: offForm.password,
+        signup_key: offForm.signup_key.trim()
+      };
+      const data = await api.registerOfficial(payload);
+      setSuccess('Official account created! Entering the scout dashboard...');
+      setTimeout(() => onAuthenticated(data.official, 'official'), 1500);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -133,15 +186,21 @@ export default function AuthScreen({ onAuthenticated, t }) {
     e.preventDefault();
     clearMessages();
     if (!resetAthleteId.trim()) {
-      setError('Please enter your Athlete ID.');
+      setError('Please enter your Athlete ID, Phone Number, or Email.');
       return;
     }
     setLoading(true);
     try {
       const data = await api.requestOTP(resetAthleteId.trim());
       setOtpSentData(data);
+      if (data.athlete_id) setResetAthleteId(data.athlete_id);
+      if (data.otp_code) setOtpCode(data.otp_code);
       setMode('otp_verify');
-      setSuccess(`OTP sent! (Prototype OTP: ${data.otp})`);
+      if (data.delivered) {
+        setSuccess(data.message || `OTP sent via SMS to ${data.contact}. Check your mobile phone.`);
+      } else {
+        setError(data.message || 'Could not deliver the SMS. See details below.');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -171,6 +230,7 @@ export default function AuthScreen({ onAuthenticated, t }) {
       setSuccess('Password reset successful! You can now login.');
       setTimeout(() => {
         setMode('login');
+        setAccountType('athlete');
         setLoginId(resetAthleteId);
         clearMessages();
       }, 2000);
@@ -181,12 +241,24 @@ export default function AuthScreen({ onAuthenticated, t }) {
     }
   };
 
+  const isOfficial = accountType === 'official';
+  const showRoleToggle = mode === 'login' || mode === 'register';
+
+  const roleBtnStyle = (active) => ({
+    flex: 1, padding: '9px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+    fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center',
+    justifyContent: 'center', gap: '6px', transition: 'all 0.2s ease',
+    border: active ? '1px solid var(--primary)' : '1px solid var(--border-glass)',
+    background: active ? 'rgba(0, 242, 254, 0.12)' : 'transparent',
+    color: active ? 'var(--primary)' : 'var(--text-muted)'
+  });
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div className="glass-panel" style={{ maxWidth: '520px', width: '100%', padding: '36px 32px' }}>
-        
+
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <div style={{
             width: '60px', height: '60px', borderRadius: '50%',
             background: 'linear-gradient(135deg, #00f2fe, #4facfe)',
@@ -198,18 +270,34 @@ export default function AuthScreen({ onAuthenticated, t }) {
             {(mode === 'forgot' || mode === 'otp_verify') && <KeyRound size={28} color="#070a12" />}
           </div>
           <h2 style={{ fontSize: '1.45rem', marginBottom: '4px' }}>
-            {mode === 'login' && 'Athlete Login'}
-            {mode === 'register' && 'New Athlete Registration'}
+            {mode === 'login' && (isOfficial ? 'Scout / Official Login' : 'Athlete Login')}
+            {mode === 'register' && (isOfficial ? 'Register Official Account' : 'New Athlete Registration')}
             {mode === 'forgot' && 'Reset Password'}
             {mode === 'otp_verify' && 'Verify OTP'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-            {mode === 'login' && 'Sign in to access your sports profile and assessments.'}
-            {mode === 'register' && 'Create your digital sports identity for talent discovery.'}
+            {mode === 'login' && (isOfficial
+              ? 'Access the talent discovery dashboard.'
+              : 'Sign in to access your sports profile and assessments.')}
+            {mode === 'register' && (isOfficial
+              ? 'For SAI scouts and officials (enrolment key required).'
+              : 'Create your digital sports identity for talent discovery.')}
             {mode === 'forgot' && 'Enter your Athlete ID to receive a reset OTP.'}
             {mode === 'otp_verify' && 'Enter the OTP and set your new password.'}
           </p>
         </div>
+
+        {/* Role toggle (Athlete / Official) */}
+        {showRoleToggle && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }}>
+            <button type="button" onClick={() => switchAccountType('athlete')} style={roleBtnStyle(!isOfficial)}>
+              <User size={16} /> Athlete
+            </button>
+            <button type="button" onClick={() => switchAccountType('official')} style={roleBtnStyle(isOfficial)}>
+              <Building2 size={16} /> Scout / Official
+            </button>
+          </div>
+        )}
 
         {/* Error / Success Messages */}
         {error && (
@@ -226,13 +314,23 @@ export default function AuthScreen({ onAuthenticated, t }) {
         {/* ═══ LOGIN FORM ═══ */}
         {mode === 'login' && (
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div>
-              <label style={labelStyle}>Athlete ID</label>
-              <input type="text" required placeholder="ATH-2026-XXXXXX" value={loginId}
-                onChange={(e) => setLoginId(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
+            {isOfficial ? (
+              <div>
+                <label style={labelStyle}>Official Email</label>
+                <input type="email" required placeholder="official@sai.gov.in" value={officialEmail}
+                  onChange={(e) => setOfficialEmail(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+            ) : (
+              <div>
+                <label style={labelStyle}>Athlete ID</label>
+                <input type="text" required placeholder="ATH-2026-XXXXXX" value={loginId}
+                  onChange={(e) => setLoginId(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+            )}
             <div>
               <label style={labelStyle}>Password</label>
               <div style={{ position: 'relative' }}>
@@ -251,20 +349,78 @@ export default function AuthScreen({ onAuthenticated, t }) {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-              <button type="button" onClick={() => { setMode('forgot'); clearMessages(); }}
-                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600 }}>
-                Forgot Password?
-              </button>
+              {!isOfficial && (
+                <button type="button" onClick={() => { setMode('forgot'); clearMessages(); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600 }}>
+                  Forgot Password?
+                </button>
+              )}
               <button type="button" onClick={() => { setMode('register'); clearMessages(); }}
-                style={{ background: 'none', border: 'none', color: 'var(--accent-green)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600 }}>
+                style={{ background: 'none', border: 'none', color: 'var(--accent-green)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600, marginLeft: 'auto' }}>
                 New? Register here
               </button>
             </div>
           </form>
         )}
 
-        {/* ═══ REGISTER FORM ═══ */}
-        {mode === 'register' && (
+        {/* ═══ OFFICIAL REGISTER FORM ═══ */}
+        {mode === 'register' && isOfficial && (
+          <form onSubmit={handleOfficialRegister} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={labelStyle}>Full Name *</label>
+              <input type="text" required placeholder="Your name" value={offForm.name}
+                onChange={(e) => setOffForm({ ...offForm, name: e.target.value })} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Official Email * (used to log in)</label>
+              <input type="email" required placeholder="official@sai.gov.in" value={offForm.email}
+                onChange={(e) => setOffForm({ ...offForm, email: e.target.value })} style={inputStyle} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={labelStyle}>Organization</label>
+                <input type="text" placeholder="e.g. SAI" value={offForm.organization}
+                  onChange={(e) => setOffForm({ ...offForm, organization: e.target.value })} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Phone</label>
+                <input type="tel" placeholder="Optional" value={offForm.phone}
+                  onChange={(e) => setOffForm({ ...offForm, phone: e.target.value })} style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={labelStyle}>Password * (min 6)</label>
+                <input type="password" required placeholder="Password" value={offForm.password}
+                  onChange={(e) => setOffForm({ ...offForm, password: e.target.value })} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Confirm Password *</label>
+                <input type="password" required placeholder="Re-enter" value={offForm.confirmPassword}
+                  onChange={(e) => setOffForm({ ...offForm, confirmPassword: e.target.value })} style={inputStyle} />
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Official Enrolment Key *</label>
+              <input type="text" required placeholder="Provided by your administrator" value={offForm.signup_key}
+                onChange={(e) => setOffForm({ ...offForm, signup_key: e.target.value })} style={inputStyle} />
+            </div>
+            <button type="submit" disabled={loading} className="btn btn-accent btn-pill"
+              style={{ marginTop: '4px', padding: '14px', width: '100%', fontSize: '1rem' }}>
+              {loading ? 'Creating Account...' : 'Register Official Account'}
+            </button>
+            <div style={{ textAlign: 'center', marginTop: '2px' }}>
+              <button type="button" onClick={() => { setMode('login'); clearMessages(); }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.82rem', cursor: 'pointer' }}>
+                <ArrowLeft size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Already registered? Sign In
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ═══ ATHLETE REGISTER FORM ═══ */}
+        {mode === 'register' && !isOfficial && (
           <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label style={labelStyle}>Full Name *</label>
@@ -405,8 +561,8 @@ export default function AuthScreen({ onAuthenticated, t }) {
         {mode === 'forgot' && (
           <form onSubmit={handleRequestOTP} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={labelStyle}>Your Athlete ID</label>
-              <input type="text" required placeholder="ATH-2026-XXXXXX" value={resetAthleteId}
+              <label style={labelStyle}>Athlete ID / Mobile Number / Email</label>
+              <input type="text" required placeholder="ATH-2026-XXXXXX or 9876543210" value={resetAthleteId}
                 onChange={(e) => setResetAthleteId(e.target.value)}
                 style={inputStyle}
               />
@@ -414,7 +570,7 @@ export default function AuthScreen({ onAuthenticated, t }) {
             <button type="submit" disabled={loading} className="btn btn-primary btn-pill"
               style={{ padding: '14px', width: '100%', fontSize: '0.95rem' }}>
               <Send size={16} />
-              {loading ? 'Sending OTP...' : 'Send OTP'}
+              {loading ? 'Sending OTP via SMS...' : 'Send Reset OTP via SMS'}
             </button>
             <div style={{ textAlign: 'center' }}>
               <button type="button" onClick={() => { setMode('login'); clearMessages(); }}
@@ -430,11 +586,38 @@ export default function AuthScreen({ onAuthenticated, t }) {
         {mode === 'otp_verify' && (
           <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {otpSentData && (
-              <div style={{ padding: '12px', background: 'rgba(0, 242, 254, 0.08)', border: '1px solid rgba(0, 242, 254, 0.25)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                <ShieldCheck size={15} style={{ verticalAlign: 'middle', color: 'var(--primary)', marginRight: '6px' }} />
-                OTP sent to: <strong style={{ color: 'var(--text-main)' }}>{otpSentData.contact}</strong>
-                <br />
-                <span style={{ fontSize: '0.75rem' }}>Expires in {otpSentData.expires_in_minutes} minutes</span>
+              <div style={{ padding: '14px', background: 'rgba(0, 242, 254, 0.08)', border: '1px solid rgba(0, 242, 254, 0.25)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span>
+                    <ShieldCheck size={16} style={{ verticalAlign: 'middle', color: 'var(--primary)', marginRight: '6px' }} />
+                    {otpSentData.delivered ? 'SMS sent to: ' : 'Recipient: '}
+                    <strong style={{ color: 'var(--text-main)' }}>{otpSentData.contact}</strong>
+                  </span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: otpSentData.delivered ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                    {otpSentData.delivered ? `✓ Sent via ${otpSentData.delivery_provider}` : '⚠ Not delivered'}
+                  </span>
+                </div>
+
+                {!otpSentData.delivered && otpSentData.debug_note && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--accent-red)', marginTop: '2px', lineHeight: 1.4 }}>
+                    {otpSentData.debug_note}
+                  </div>
+                )}
+
+                {otpSentData.otp_code && (
+                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)', padding: '6px 10px', borderRadius: 'var(--radius-sm)' }}>
+                    <span style={{ fontSize: '0.78rem' }}>OTP Code: <strong className="mono" style={{ color: 'var(--accent-green)', fontSize: '1.05rem', letterSpacing: '0.1em' }}>{otpSentData.otp_code}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => setOtpCode(otpSentData.otp_code)}
+                      style={{ background: 'var(--primary)', color: '#000', border: 'none', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      ⚡ Auto-fill OTP
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>Expires in {otpSentData.expires_in_minutes} minutes</div>
               </div>
             )}
             <div>

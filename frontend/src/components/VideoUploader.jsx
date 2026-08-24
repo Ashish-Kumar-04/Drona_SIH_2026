@@ -1,18 +1,21 @@
-import React, { useState, useRef } from 'react';
-import { Upload, Video, Camera, StopCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, Video, RefreshCw, AlertCircle, CheckCircle2, FileVideo, CloudOff } from 'lucide-react';
+import LiveWebcamGuidance from './LiveWebcamGuidance';
 import { api } from '../utils/api';
 
-export default function VideoUploader({ athleteId, testType, onProcessingComplete, t }) {
+export default function VideoUploader({ athleteId, testType, initialMode = 'file', onProcessingComplete, t }) {
+  const [mode, setMode] = useState(initialMode); // 'file' | 'webcam'
   const [selectedFile, setSelectedFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [queuedNotice, setQueuedNotice] = useState(false);
 
   const fileInputRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const webcamVideoRef = useRef(null);
-  const recordedChunksRef = useRef([]);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
   // Handle local video file selection
   const handleFileChange = (e) => {
@@ -24,6 +27,13 @@ export default function VideoUploader({ athleteId, testType, onProcessingComplet
     }
   };
 
+  // Callback when live webcam recording finishes
+  const handleLiveWebcamRecorded = (file, previewUrl) => {
+    setSelectedFile(file);
+    setVideoPreviewUrl(previewUrl);
+    setMode('file'); // Switch to review & analyze view
+  };
+
   // Start real video upload & AI inference on FastAPI backend
   const handleProcessVideo = async () => {
     if (!selectedFile) {
@@ -33,10 +43,20 @@ export default function VideoUploader({ athleteId, testType, onProcessingComplet
 
     setIsProcessing(true);
     setErrorMsg(null);
+    setQueuedNotice(false);
 
     try {
       const result = await api.uploadVideo(selectedFile, athleteId, testType, 170.0);
-      onProcessingComplete(result, videoPreviewUrl);
+      if (result && result.queued) {
+        // No network — the video was stashed in IndexedDB and will auto-submit on reconnect.
+        // There is no assessment result yet, so stay on this screen rather than navigating.
+        setQueuedNotice(true);
+        setSelectedFile(null);
+        setVideoPreviewUrl(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } else {
+        onProcessingComplete(result, videoPreviewUrl);
+      }
     } catch (err) {
       setErrorMsg(err.message || 'AI video processing failed.');
     } finally {
@@ -44,52 +64,35 @@ export default function VideoUploader({ athleteId, testType, onProcessingComplet
     }
   };
 
-  // Live Webcam Recording
-  const startWebcamRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      if (webcamVideoRef.current) {
-        webcamVideoRef.current.srcObject = stream;
-        webcamVideoRef.current.play();
-      }
-
-      recordedChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
-      };
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/mp4' });
-        const file = new File([blob], 'webcam_assessment.mp4', { type: 'video/mp4' });
-        setSelectedFile(file);
-        setVideoPreviewUrl(URL.createObjectURL(blob));
-        // Stop stream tracks
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
-      setIsRecording(true);
-      setErrorMsg(null);
-    } catch (err) {
-      setErrorMsg('Webcam permission denied or camera not found.');
-    }
-  };
-
-  const stopWebcamRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
+  // Render Live Webcam Guidance when mode is webcam
+  if (mode === 'webcam') {
+    return (
+      <LiveWebcamGuidance
+        testType={testType}
+        onRecordingComplete={handleLiveWebcamRecorded}
+        onCancel={() => setMode('file')}
+        t={t}
+      />
+    );
+  }
 
   return (
     <div className="glass-panel" style={{ padding: '24px', textAlign: 'center' }}>
-      <h3 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>
-        Record or Upload Real Test Video
-      </h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <h3 style={{ fontSize: '1.25rem', margin: 0 }}>
+          Submit Test Video for AI Analysis
+        </h3>
+        <button
+          onClick={() => setMode('webcam')}
+          className="btn btn-secondary"
+          style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+        >
+          📷 Record Live Webcam Instead
+        </button>
+      </div>
+
       <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '20px' }}>
-        Upload any real athlete test video (.mp4, .mov, .webm) or record live via camera for instant AI MediaPipe Pose analysis.
+        Upload any athlete test video file (.mp4, .mov, .webm) for instant MediaPipe Pose AI analysis.
       </p>
 
       {/* Error alert */}
@@ -112,104 +115,89 @@ export default function VideoUploader({ athleteId, testType, onProcessingComplet
         </div>
       )}
 
-      {/* Recording Webcam View */}
-      {isRecording && (
-        <div style={{ position: 'relative', marginBottom: '16px', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          <video
-            ref={webcamVideoRef}
-            muted
-            style={{ width: '100%', maxHeight: '360px', background: '#000', objectFit: 'cover' }}
-          />
-          <div style={{
-            position: 'absolute',
-            top: '12px',
-            left: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(255, 56, 92, 0.9)',
-            padding: '4px 10px',
-            borderRadius: 'var(--radius-pill)',
-            fontSize: '0.75rem',
-            fontWeight: 700
-          }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fff' }} />
-            RECORDING LIVE ASSESSMENT
-          </div>
+      {/* Offline-saved notice */}
+      {queuedNotice && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 14px',
+          background: 'rgba(255, 176, 32, 0.12)',
+          border: '1px solid rgba(255, 176, 32, 0.4)',
+          borderRadius: 'var(--radius-md)',
+          color: '#ffb020',
+          fontSize: '0.85rem',
+          marginBottom: '16px',
+          textAlign: 'left'
+        }}>
+          <CloudOff size={20} />
+          <span>
+            <strong>Saved offline.</strong> You have no network right now — this assessment
+            was stored on your device and will submit automatically once you're back online.
+          </span>
         </div>
       )}
 
-      {/* Upload & Webcam Action Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '14px',
-        marginBottom: '20px'
-      }}>
-        {/* File Upload Trigger */}
-        <input
-          type="file"
-          accept="video/*"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          style={{ display: 'none' }}
-        />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="btn btn-secondary"
-          style={{ padding: '16px', display: 'flex', flexDirection: 'column', height: '100px' }}
-        >
-          <Upload size={24} color="var(--primary)" />
-          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Choose Video File</span>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>MP4, MOV, WEBM</span>
-        </button>
+      {/* File Upload Selector Box */}
+      <input
+        type="file"
+        accept="video/*"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
 
-        {/* Live Camera Trigger */}
-        {!isRecording ? (
-          <button
-            onClick={startWebcamRecording}
-            className="btn btn-secondary"
-            style={{ padding: '16px', display: 'flex', flexDirection: 'column', height: '100px' }}
-          >
-            <Camera size={24} color="var(--accent-green)" />
-            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Record Webcam</span>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Live Camera Feed</span>
-          </button>
-        ) : (
-          <button
-            onClick={stopWebcamRecording}
-            className="btn btn-danger"
-            style={{ padding: '16px', display: 'flex', flexDirection: 'column', height: '100px' }}
-          >
-            <StopCircle size={24} />
-            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Stop Recording</span>
-            <span style={{ fontSize: '0.72rem' }}>Finish Test Clip</span>
-          </button>
-        )}
+      <div
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          border: '2px dashed var(--border-glow)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '32px 20px',
+          cursor: 'pointer',
+          background: 'rgba(0, 242, 254, 0.02)',
+          marginBottom: '20px',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        <Upload size={36} color="var(--primary)" style={{ marginBottom: '10px' }} />
+        <div style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>
+          Click to Browse & Select Video File
+        </div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+          Supports MP4, MOV, WEBM format
+        </div>
       </div>
 
-      {/* Selected File Status */}
+      {/* Selected File Status / Video Preview */}
       {selectedFile && (
         <div style={{
-          padding: '12px 16px',
-          background: 'rgba(0, 242, 254, 0.05)',
+          padding: '14px 18px',
+          background: 'rgba(0, 242, 254, 0.06)',
           border: '1px solid var(--border-glow)',
           borderRadius: 'var(--radius-md)',
           marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
+          textAlign: 'left'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', textAlign: 'left' }}>
-            <Video size={20} color="var(--primary)" />
-            <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{selectedFile.name}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Size: {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <FileVideo size={24} color="var(--primary)" />
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{selectedFile.name}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Size: {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                </div>
               </div>
             </div>
+            <span className="badge badge-valid">Ready for Analysis</span>
           </div>
-          <span className="badge badge-valid">Ready to Process</span>
+
+          {videoPreviewUrl && (
+            <video
+              src={videoPreviewUrl}
+              controls
+              style={{ width: '100%', maxHeight: '240px', borderRadius: 'var(--radius-sm)', background: '#000' }}
+            />
+          )}
         </div>
       )}
 

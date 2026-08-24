@@ -4,28 +4,45 @@ import AuthScreen from './components/AuthScreen';
 import TestSelection from './components/TestSelection';
 import CameraGuidance from './components/CameraGuidance';
 import VideoUploader from './components/VideoUploader';
+import ManualEntryForm from './components/ManualEntryForm';
 import PoseVideoPlayer from './components/PoseVideoPlayer';
 import LiveMetricsHUD from './components/LiveMetricsHUD';
 import AthleteProfileView from './components/AthleteProfileView';
+import ScoutDashboard from './components/ScoutDashboard';
 import { translations } from './utils/i18n';
-import { api } from './utils/api';
-import { ArrowLeft } from 'lucide-react';
+import { api, getAccountType, clearAuth } from './utils/api';
+import { isManualTest } from './utils/tests';
+import { ArrowLeft, Download } from 'lucide-react';
 
 export default function App() {
   const [lang, setLang] = useState('en');
+  const [accountType, setAccountType] = useState(null); // 'athlete' | 'official' | null
   const [athlete, setAthlete] = useState(null);
+  const [official, setOfficial] = useState(null);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Athlete workflow: 'profile' | 'select_test' | 'guidance' | 'assessment' | 'results'
+  // Athlete workflow: 'profile' | 'select_test' | 'guidance' | 'assessment' | 'manual_entry' | 'results'
   const [athleteStep, setAthleteStep] = useState('profile');
   const [selectedTest, setSelectedTest] = useState('vertical_jump');
+  const [assessmentMode, setAssessmentMode] = useState('file');
   const [latestAssessmentResult, setLatestAssessmentResult] = useState(null);
   const [activeVideoSrc, setActiveVideoSrc] = useState(null);
 
   const t = translations[lang] || translations.en;
 
-  // ─── Load profile from database ───
+  // ─── Reset all session state to logged-out ───
+  const resetSession = () => {
+    setAccountType(null);
+    setAthlete(null);
+    setOfficial(null);
+    setProfileData(null);
+    setAthleteStep('profile');
+    setLatestAssessmentResult(null);
+    setActiveVideoSrc(null);
+  };
+
+  // ─── Load athlete profile from database ───
   const loadProfile = async (athleteId) => {
     try {
       const data = await api.getAthleteProfile(athleteId);
@@ -33,43 +50,67 @@ export default function App() {
       setAthlete(data.athlete);
     } catch (err) {
       console.error('Failed to load profile:', err);
-      // If profile load fails, clear session
-      localStorage.removeItem('athlete_id');
-      setAthlete(null);
-      setProfileData(null);
+      // If profile load fails, clear the session cleanly.
+      clearAuth();
+      resetSession();
     }
   };
 
-  // ─── Check localStorage for existing session on app load ───
+  // ─── Restore existing session on app load (based on stored account type) ───
   useEffect(() => {
-    const savedId = localStorage.getItem('athlete_id');
-    if (savedId) {
-      loadProfile(savedId).finally(() => setLoading(false));
+    const type = getAccountType();
+    if (type === 'official') {
+      try {
+        const stored = JSON.parse(localStorage.getItem('official_data') || 'null');
+        if (stored) {
+          setOfficial(stored);
+          setAccountType('official');
+        }
+      } catch (_) { /* ignore malformed cache */ }
+      setLoading(false);
+    } else if (type === 'athlete') {
+      const savedId = localStorage.getItem('athlete_id');
+      if (savedId) {
+        setAccountType('athlete');
+        loadProfile(savedId).finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
     } else {
       setLoading(false);
     }
   }, []);
 
+  // ─── Force logout when a request reports the token is invalid/expired ───
+  useEffect(() => {
+    const onUnauthorized = () => resetSession();
+    window.addEventListener('auth:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+  }, []);
+
   // ─── Auth handlers ───
-  const handleAuthenticated = (athleteData) => {
-    setAthlete(athleteData);
-    loadProfile(athleteData.athlete_id);
-    setAthleteStep('profile');
+  const handleAuthenticated = (data, type) => {
+    setAccountType(type);
+    if (type === 'official') {
+      setOfficial(data);
+    } else {
+      setAthlete(data);
+      loadProfile(data.athlete_id);
+      setAthleteStep('profile');
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('athlete_id');
-    setAthlete(null);
-    setProfileData(null);
-    setAthleteStep('profile');
-    setLatestAssessmentResult(null);
-    setActiveVideoSrc(null);
+    clearAuth();
+    resetSession();
   };
 
   // ─── Test flow handlers ───
   const handleSelectTest = (testId) => {
     setSelectedTest(testId);
-    setAthleteStep('guidance');
+    // Manual-capture tests (50m dash, 600m run, sit & reach) skip the camera
+    // guidance/upload flow and go straight to an officiated result-entry form.
+    setAthleteStep(isManualTest(testId) ? 'manual_entry' : 'guidance');
   };
 
   const handleGuidanceReady = () => {
@@ -106,6 +147,35 @@ export default function App() {
   }
 
   // ─── Not logged in → show Auth ───
+  if (!accountType) {
+    return <AuthScreen onAuthenticated={handleAuthenticated} t={t} />;
+  }
+
+  // ─── Official / Scout → Talent Discovery Dashboard ───
+  if (accountType === 'official') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Navbar
+          user={official ? { name: official.name, id: official.official_id } : null}
+          roleLabel={t.roles.scout}
+          onLogout={handleLogout}
+          lang={lang} setLang={setLang} t={t}
+        />
+        <main style={{ flex: 1, padding: '24px 20px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+          <ScoutDashboard official={official} t={t} lang={lang} />
+        </main>
+        <footer style={{
+          textAlign: 'center', padding: '18px', fontSize: '0.72rem',
+          color: 'var(--text-dim)', borderTop: '1px solid var(--border-glass)',
+          background: 'rgba(7, 10, 18, 0.9)'
+        }}>
+          National Sports Talent Assessment Platform • SIH 25073 • Powered by AI + MediaPipe
+        </footer>
+      </div>
+    );
+  }
+
+  // ─── Athlete not yet resolved (edge) → back to Auth ───
   if (!athlete) {
     return <AuthScreen onAuthenticated={handleAuthenticated} t={t} />;
   }
@@ -144,10 +214,11 @@ export default function App() {
           />
         )}
 
-        {/* Step 3: Camera Guidance */}
+        {/* Step 3: Camera Guidance / Method Selection */}
         {athleteStep === 'guidance' && (
           <CameraGuidance
-            onReady={handleGuidanceReady}
+            onChooseUpload={() => { setAssessmentMode('file'); setAthleteStep('assessment'); }}
+            onChooseWebcam={() => { setAssessmentMode('webcam'); setAthleteStep('assessment'); }}
             testTitle={selectedTest}
             t={t}
           />
@@ -158,7 +229,18 @@ export default function App() {
           <VideoUploader
             athleteId={athlete.athlete_id}
             testType={selectedTest}
+            initialMode={assessmentMode}
             onProcessingComplete={handleAssessmentComplete}
+            t={t}
+          />
+        )}
+
+        {/* Step 4b: Manual / assisted result entry (non-CV tests) */}
+        {athleteStep === 'manual_entry' && (
+          <ManualEntryForm
+            athleteId={athlete.athlete_id}
+            testType={selectedTest}
+            onComplete={() => { setAthleteStep('profile'); loadProfile(athlete.athlete_id); }}
             t={t}
           />
         )}
@@ -187,10 +269,16 @@ export default function App() {
               t={t}
             />
 
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '20px', flexWrap: 'wrap' }}>
               <button onClick={() => { setAthleteStep('profile'); loadProfile(athlete.athlete_id); }}
-                className="btn btn-primary" style={{ flex: 1, padding: '14px' }}>
+                className="btn btn-primary" style={{ flex: 1, minWidth: '160px', padding: '14px' }}>
                 View Updated Profile
+              </button>
+              <button
+                onClick={() => api.downloadCertificate(latestAssessmentResult.assessment_id)
+                  .catch(err => alert(err.message || 'Certificate download failed.'))}
+                className="btn btn-secondary" style={{ padding: '14px' }}>
+                <Download size={16} /> {t.certificate || 'Download Certificate'}
               </button>
               <button onClick={() => setAthleteStep('select_test')}
                 className="btn btn-secondary" style={{ padding: '14px' }}>

@@ -1,7 +1,36 @@
-import React from 'react';
-import { Globe, Activity, LogOut, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Globe, Activity, LogOut, User, WifiOff, UploadCloud } from 'lucide-react';
+import { queueCount } from '../utils/offlineQueue';
 
-export default function Navbar({ athlete, onLogout, lang, setLang, t }) {
+export default function Navbar({ athlete, user, roleLabel, onLogout, lang, setLang, t }) {
+  // Normalize whichever account is signed in (athlete or official) into {name, id}.
+  const acct = user || (athlete ? { name: athlete.name, id: athlete.athlete_id } : null);
+
+  // Live network + offline-queue status (only meaningful for athletes, but harmless otherwise).
+  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+  const [pending, setPending] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => { queueCount().then(setPending).catch(() => {}); };
+    const goOnline = () => { setOnline(true); refresh(); };
+    const goOffline = () => setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('queue:changed', refresh);
+    refresh();
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('queue:changed', refresh);
+    };
+  }, []);
+
+  const statusPill = {
+    display: 'flex', alignItems: 'center', gap: '6px',
+    padding: '6px 12px', borderRadius: 'var(--radius-pill)',
+    fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap'
+  };
+
   return (
     <header style={{
       display: 'flex',
@@ -40,8 +69,30 @@ export default function Navbar({ athlete, onLogout, lang, setLang, t }) {
 
       {/* Right side — athlete info + language + logout */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        {/* Athlete info (when logged in) */}
-        {athlete && (
+        {/* Offline / pending-sync status */}
+        {!online && (
+          <span style={{
+            ...statusPill,
+            background: 'rgba(255, 176, 32, 0.14)',
+            border: '1px solid rgba(255, 176, 32, 0.4)',
+            color: '#ffb020'
+          }} title="No network — assessments will be saved on this device">
+            <WifiOff size={13} /> Offline
+          </span>
+        )}
+        {pending > 0 && (
+          <span style={{
+            ...statusPill,
+            background: 'rgba(0, 242, 254, 0.1)',
+            border: '1px solid var(--border-glow)',
+            color: 'var(--primary)'
+          }} title="Assessments waiting to sync">
+            <UploadCloud size={13} /> {pending} pending
+          </span>
+        )}
+
+        {/* Account info (when logged in) */}
+        {acct && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '10px',
             padding: '6px 14px',
@@ -58,10 +109,10 @@ export default function Navbar({ athlete, onLogout, lang, setLang, t }) {
             </div>
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.2 }}>
-                {athlete.name}
+                {acct.name}
               </div>
               <div className="mono" style={{ fontSize: '0.65rem', color: 'var(--primary)' }}>
-                {athlete.athlete_id}
+                {roleLabel ? `${roleLabel} • ${acct.id}` : acct.id}
               </div>
             </div>
           </div>
@@ -88,7 +139,7 @@ export default function Navbar({ athlete, onLogout, lang, setLang, t }) {
         </div>
 
         {/* Logout */}
-        {athlete && (
+        {acct && (
           <button onClick={onLogout} className="btn btn-secondary"
             style={{ padding: '7px 14px', fontSize: '0.8rem', borderRadius: 'var(--radius-pill)' }}>
             <LogOut size={15} />

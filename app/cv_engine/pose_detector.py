@@ -162,15 +162,33 @@ class PoseDetector:
 
     @staticmethod
     def check_camera_guidance(landmarks_history: List[Dict[str, Tuple[float, float, float]]],
-                               frame_bgr: Optional[np.ndarray] = None) -> Dict[str, Any]:
+                               frame_bgr: Optional[np.ndarray] = None,
+                               test_type: Optional[str] = None) -> Dict[str, Any]:
         """
         AI Camera Guidance Check (Section 8 of specification).
-        Checks:
-        1. Full body visibility
-        2. Camera stability
-        3. Lighting & clarity (if raw frame provided)
-        4. Testing area posture readiness
+
+        From the latest pose frame this computes, in addition to the original checks:
+          * centering       — hip mid-point vs frame centre (are you in the middle of the shot?)
+          * distance_ok     — nose→ankle body span vs frame height (too close / too far / good)
+          * orientation_ok  — shoulder-width ÷ torso-height ⇒ front-on vs side-on, checked against
+                              what the chosen test needs (sit-up / broad jump → side; vertical jump
+                              → front; shuttle → any)
+          * instruction     — the single most useful next correction, in plain language
+          * alignment_score — 0-100 readiness score the UI can gate the Start button on
+
+        `test_type` is optional and backward-compatible: when omitted, orientation is not enforced.
+        All original keys (`ready`, `full_body_visible`, `camera_stable`, `lighting_sufficient`,
+        `athlete_positioned`, `message`) are still returned.
         """
+        # Per-test camera orientation requirement.
+        ORIENTATION_REQ = {
+            "sit_up": "side",        # camera to the side to read the hip/torso angle
+            "broad_jump": "side",    # side-on to measure horizontal distance
+            "vertical_jump": "front",# face-on, whole body, to read the flight
+            "shuttle_run": "any",    # runs across the frame — orientation not critical
+        }
+        req_orientation = ORIENTATION_REQ.get(test_type or "", "any")
+
         if not landmarks_history:
             return {
                 "ready": False,
@@ -178,18 +196,35 @@ class PoseDetector:
                 "camera_stable": False,
                 "lighting_sufficient": True,
                 "athlete_positioned": False,
+                "centered": False,
+                "distance_ok": False,
+                "orientation_ok": (req_orientation == "any"),
+                "orientation": None,
+                "off_center_x": None,
+                "off_center_y": None,
+                "alignment_score": 0,
+                "test_type": test_type,
+                "instruction": "No athlete detected — step into the camera's view.",
                 "message": "No athlete detected in camera frame."
             }
 
         latest_frame = landmarks_history[-1]
-        
+
+        def _pt(name):
+            """Return (x, y, vis) if the landmark is present and reasonably visible, else None."""
+            v = latest_frame.get(name)
+            if v is None:
+                return None
+            x, y, vis = v
+            return (x, y, vis) if vis is not None and vis > 0.4 else None
+
         # 1. Full Body Visibility Check
         required_landmarks = [
             "NOSE", "LEFT_SHOULDER", "RIGHT_SHOULDER",
             "LEFT_HIP", "RIGHT_HIP", "LEFT_KNEE", "RIGHT_KNEE",
             "LEFT_ANKLE", "RIGHT_ANKLE"
         ]
-        
+
         visible_count = 0
         for key in required_landmarks:
             if key in latest_frame:
@@ -208,7 +243,7 @@ class PoseDetector:
                     mid_hip_x = (frame["LEFT_HIP"][0] + frame["RIGHT_HIP"][0]) / 2.0
                     mid_hip_y = (frame["LEFT_HIP"][1] + frame["RIGHT_HIP"][1]) / 2.0
                     hip_positions.append([mid_hip_x, mid_hip_y])
-            
+
             if len(hip_positions) > 3:
                 variance = float(np.var(hip_positions, axis=0).sum())
                 # If variance is excessively high, camera or person is violently shaking
@@ -222,10 +257,97 @@ class PoseDetector:
             laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
             lighting_sufficient = (brightness > 40.0 and laplacian_var > 30.0)
 
-        athlete_positioned = full_body_visible and camera_stable
-        ready = full_body_visible and camera_stable and lighting_sufficient
+        # 4. Centering — hip mid-point relative to the frame centre.
+        centered = False
+        off_center_x = None
+        off_center_y = None
+        centering_msg = None
+        lh, rh = _pt("LEFT_HIP"), _pt("RIGHT_HIP")
+        if lh and rh:
+            mid_hip_x = (lh[0] + rh[0]) / 2.0
+            mid_hip_y = (lh[1] + rh[1]) / 2.0
+            off_center_x = round(mid_hip_x - 0.5, 3)      # +ve ⇒ athlete is right-of-centre in frame
+            off_center_y = round(mid_hip_y - 0.55, 3)     # target hips slightly below centre
+            centered = abs(off_center_x) <= 0.15
+            if off_center_x > 0.15:
+                centering_msg = "You're too far to the right of the frame — move to the centre."
+            elif off_center_x < -0.15:
+                centering_msg = "You're too far to the left of the frame — move to the centre."
 
-        message = "READY to begin assessment" if ready else "Please adjust camera angle to ensure full body visibility and stability."
+        # 5. Distance — vertical body span (nose → lowest ankle) as a fraction of frame height.
+        distance_ok = False
+        distance_msg = None
+        nose = _pt("NOSE")
+        ankles = [p for p in (_pt("LEFT_ANKLE"), _pt("RIGHT_ANKLE")) if p]
+        if nose and ankles:
+            nose_y = nose[1]
+            ankle_y = max(p[1] for p in ankles)
+            span = ankle_y - nose_y
+            top_clip = nose_y < 0.06
+            bottom_clip = ankle_y > 0.96
+            if top_clip or bottom_clip:
+                distance_msg = "Step back so your whole body — head to feet — fits in the frame."
+            elif span < 0.45:
+                distance_msg = "Move a little closer — you look too small in the frame."
+            else:
+                distance_ok = True
+        # If nose/ankles aren't visible the full-body check already owns the instruction.
+
+        # 6. Orientation — shoulder width vs torso height ⇒ front-on / side-on.
+        orientation = None
+        orientation_ok = True
+        orientation_msg = None
+        ls, rs = _pt("LEFT_SHOULDER"), _pt("RIGHT_SHOULDER")
+        if ls and rs and lh and rh:
+            shoulder_width = abs(ls[0] - rs[0])
+            mid_sh_y = (ls[1] + rs[1]) / 2.0
+            mid_hip_y = (lh[1] + rh[1]) / 2.0
+            torso_h = abs(mid_hip_y - mid_sh_y)
+            if torso_h > 0.05:
+                ratio = shoulder_width / torso_h
+                if ratio >= 0.42:
+                    orientation = "front"
+                elif ratio <= 0.30:
+                    orientation = "side"
+                else:
+                    orientation = "angled"   # in-between; accepted for either requirement
+        if req_orientation != "any" and orientation is not None:
+            if req_orientation == "front" and orientation == "side":
+                orientation_ok = False
+                orientation_msg = "Face the camera so your whole body is visible."
+            elif req_orientation == "side" and orientation == "front":
+                orientation_ok = False
+                orientation_msg = "Turn side-on to the camera so it sees your profile."
+
+        athlete_positioned = full_body_visible and camera_stable and centered
+
+        # Weighted readiness score (0-100). Full-body visibility dominates.
+        alignment_score = int(round(
+            35 * full_body_visible +
+            20 * centered +
+            25 * distance_ok +
+            10 * orientation_ok +
+            10 * lighting_sufficient
+        ))
+
+        ready = (full_body_visible and centered and distance_ok
+                 and orientation_ok and lighting_sufficient and camera_stable)
+
+        # Single, prioritized instruction — the most useful next correction.
+        if not full_body_visible:
+            instruction = "Make sure your whole body — head to feet — is visible in the frame."
+        elif distance_msg:
+            instruction = distance_msg
+        elif not camera_stable:
+            instruction = "Keep the camera still — prop it up on a stable surface."
+        elif centering_msg:
+            instruction = centering_msg
+        elif orientation_msg:
+            instruction = orientation_msg
+        elif not lighting_sufficient:
+            instruction = "Find a brighter, evenly-lit spot so the camera can see you clearly."
+        else:
+            instruction = "Perfect — hold still and press Start."
 
         return {
             "ready": ready,
@@ -233,5 +355,14 @@ class PoseDetector:
             "camera_stable": camera_stable,
             "lighting_sufficient": lighting_sufficient,
             "athlete_positioned": athlete_positioned,
-            "message": message
+            "centered": centered,
+            "distance_ok": distance_ok,
+            "orientation_ok": orientation_ok,
+            "orientation": orientation,
+            "off_center_x": off_center_x,
+            "off_center_y": off_center_y,
+            "alignment_score": alignment_score,
+            "test_type": test_type,
+            "instruction": instruction,
+            "message": instruction
         }

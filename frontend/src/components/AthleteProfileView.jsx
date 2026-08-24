@@ -1,5 +1,8 @@
 import React from 'react';
-import { User, MapPin, Zap, Award, Calendar, Ruler, Weight } from 'lucide-react';
+import { User, MapPin, Zap, Award, Calendar, Ruler, Weight, Download } from 'lucide-react';
+import { api } from '../utils/api';
+import { formatTestName } from '../utils/tests';
+import CoachingFeedback from './CoachingFeedback';
 
 function getBenchmarkBadge(score) {
   if (score >= 80) return { text: 'Excellent', className: 'badge badge-valid' };
@@ -16,11 +19,6 @@ function formatDate(timestamp) {
     day: 'numeric', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   });
-}
-
-function formatTestName(type) {
-  const names = { sit_up: 'Sit-ups', vertical_jump: 'Vertical Jump', shuttle_run: '10×4m Shuttle Run' };
-  return names[type] || type;
 }
 
 export default function AthleteProfileView({ profile, onTakeNewTest, t }) {
@@ -42,7 +40,14 @@ export default function AthleteProfileView({ profile, onTakeNewTest, t }) {
     { label: t.domains?.strength || 'Strength', score: performance ? Math.round(performance.strength_score) : 0, color: '#00f5a0' },
     { label: t.domains?.power || 'Explosive Power', score: performance ? Math.round(performance.power_score) : 0, color: '#ffb800' },
     { label: t.domains?.endurance || 'Endurance', score: performance ? Math.round(performance.endurance_score) : 0, color: '#9d4edd' },
+    { label: t.domains?.flexibility || 'Flexibility', score: performance ? Math.round(performance.flexibility_score || 0) : 0, color: '#00c2a8' },
   ];
+
+  // Body composition (BMI) is a two-sided "optimal band" indicator, shown apart
+  // from the higher-is-better athletic domains above.
+  const bmi = performance?.bmi ?? null;
+  const bodyCompScore = performance ? Math.round(performance.body_composition_score || 0) : 0;
+  const testsCompleted = performance?.tests_completed ?? 0;
 
   const radius = 58;
   const circumference = 2 * Math.PI * radius;
@@ -140,8 +145,28 @@ export default function AthleteProfileView({ profile, onTakeNewTest, t }) {
                 Athletic Performance Index
               </h3>
               <p style={{ fontSize: '0.76rem', color: 'var(--text-dim)', maxWidth: '180px' }}>
-                {overallIndex === 0 ? 'Complete your first assessment to see your score.' : 'Aggregated 5-domain physical capability score.'}
+                {overallIndex === 0
+                  ? 'Complete your first assessment to see your score.'
+                  : `Weighted score across ${testsCompleted || 'your'} assessed fitness ${testsCompleted === 1 ? 'test' : 'tests'}.`}
               </p>
+              {/* Body composition (BMI) — two-sided optimal-band indicator */}
+              {bmi != null && (
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '10px',
+                  padding: '6px 12px', background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-pill)'
+                }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    {t.domains?.bodyComposition || 'Body Composition'}
+                  </span>
+                  <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    BMI {bmi.toFixed(1)}
+                  </span>
+                  <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00c2a8' }}>
+                    {bodyCompScore}/100
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -196,37 +221,49 @@ export default function AthleteProfileView({ profile, onTakeNewTest, t }) {
                 : item.status === 'SUSPICIOUS' ? 'badge badge-warning' : 'badge badge-danger';
               return (
                 <div key={item.assessment_id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '14px 18px', background: 'rgba(255, 255, 255, 0.02)',
                   border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)',
                   transition: 'border-color 0.2s ease'
                 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                      <span style={{ fontWeight: 700 }}>{formatTestName(item.test_type)}</span>
-                      <span className={statusBadge} style={{ fontSize: '0.63rem' }}>
-                        {item.status}
-                      </span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                        <span style={{ fontWeight: 700 }}>{formatTestName(item.test_type, t)}</span>
+                        <span className={statusBadge} style={{ fontSize: '0.63rem' }}>
+                          {item.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Result: <strong style={{ color: 'var(--text-main)' }}>{item.raw_score} {item.unit}</strong>
+                        {' '}• Confidence: {Math.round(item.confidence)}%
+                        {' '}• Validity: {Math.round(item.validation_score)}%
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                        <Calendar size={11} />
+                        {formatDate(item.timestamp)}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Result: <strong style={{ color: 'var(--text-main)' }}>{item.raw_score} {item.unit}</strong>
-                      {' '}• Confidence: {Math.round(item.confidence)}%
-                      {' '}• Validity: {Math.round(item.validation_score)}%
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '2px' }}>
-                      <Calendar size={11} />
-                      {formatDate(item.timestamp)}
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-green)' }}>
+                        {Math.round(item.normalized_score)}<span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>/100</span>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>
+                        {item.benchmark_status}
+                      </div>
+                      <button
+                        onClick={() => api.downloadCertificate(item.assessment_id)
+                          .catch(err => alert(err.message || 'Certificate download failed.'))}
+                        className="btn btn-secondary"
+                        style={{ padding: '4px 10px', fontSize: '0.65rem', marginTop: '8px' }}
+                        title="Download verified certificate">
+                        <Download size={12} /> {t?.certificate || 'Certificate'}
+                      </button>
                     </div>
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="mono" style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-green)' }}>
-                      {Math.round(item.normalized_score)}<span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>/100</span>
-                    </div>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>
-                      {item.benchmark_status}
-                    </div>
-                  </div>
+                  {/* Corrective coaching for this result — what to fix and how to improve */}
+                  <CoachingFeedback coaching={item.coaching} t={t} compact />
                 </div>
               );
             })}

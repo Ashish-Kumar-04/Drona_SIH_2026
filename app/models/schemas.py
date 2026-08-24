@@ -42,6 +42,38 @@ class AthleteResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# ─── Official / Scout account schemas ───
+class OfficialRegister(BaseModel):
+    name: str
+    email: str
+    organization: Optional[str] = None
+    phone: Optional[str] = None
+    password: str = Field(..., min_length=6, description="Account password (min 6 chars)")
+    signup_key: str = Field(..., description="Shared official enrolment key")
+
+class OfficialLogin(BaseModel):
+    email: str
+    password: str
+
+class OfficialResponse(BaseModel):
+    official_id: str
+    name: str
+    email: str
+    organization: Optional[str]
+    phone: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Auth token returned by athlete/official login and registration
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    account_type: str  # "athlete" | "official"
+    athlete: Optional[AthleteResponse] = None
+    official: Optional[OfficialResponse] = None
+
 # OTP Password Reset Schemas
 class OTPRequestSchema(BaseModel):
     athlete_id: str
@@ -63,10 +95,22 @@ class LandmarkFrame(BaseModel):
 
 class VideoAssessmentRequest(BaseModel):
     athlete_id: str
-    test_type: str # sit_up, vertical_jump, shuttle_run
+    test_type: str # CV tests: sit_up, vertical_jump, shuttle_run, broad_jump
     fps: float = 30.0
     frames: List[LandmarkFrame]
     reference_height_cm: Optional[float] = 170.0 # for scale ratio if available
+
+class ManualAssessmentRequest(BaseModel):
+    """
+    Assisted / manual result entry for tests that cannot be reliably measured by CV from a
+    single phone clip (50m dash, 600m endurance run, sit & reach) or from a tape measure
+    (broad jump). Validated against the registry's plausibility bounds server-side.
+    """
+    athlete_id: str
+    test_type: str  # sprint_50m, endurance_run, sit_and_reach, broad_jump
+    raw_value: float = Field(..., description="Measured result in the test's unit (seconds or cm)")
+    officiated: bool = Field(False, description="True if recorded/supervised by an official")
+    notes: Optional[str] = None
 
 class AssessmentResponse(BaseModel):
     assessment_id: str
@@ -82,6 +126,9 @@ class AssessmentResponse(BaseModel):
     benchmark_source: str
     timestamp: datetime
     details: Dict[str, Any]
+    # Corrective coaching feedback (what went wrong + how to improve). Not a signed field —
+    # it also rides inside `details`, so it never affects the tamper-evident HMAC signature.
+    coaching: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True
@@ -93,7 +140,11 @@ class PerformanceResponse(BaseModel):
     strength_score: float
     power_score: float
     endurance_score: float
+    flexibility_score: float = 0.0
+    body_composition_score: float = 0.0
+    bmi: Optional[float] = None
     overall_index: float
+    tests_completed: int = 0
 
     class Config:
         from_attributes = True

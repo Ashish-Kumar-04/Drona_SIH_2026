@@ -8,13 +8,16 @@ import sys
 import os
 import json
 import numpy as np
+import uuid
 from datetime import datetime
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.abspath("."))
 
 from app.database.session import init_db, SessionLocal
-from app.models.db_models import Athlete, Assessment, Performance
+from app.models.db_models import Athlete, Assessment, Performance, Official
+from app.core import security
+from app.services import verification as cert_sig
 from app.cv_engine.pose_detector import PoseDetector
 from app.cv_engine.situp_analyzer import SitUpAnalyzer
 from app.cv_engine.vertical_jump_analyzer import VerticalJumpAnalyzer
@@ -124,7 +127,7 @@ def main():
             district="Prayagraj",
             school="Kendriya Vidyalaya",
             sports_interest="Athletics / Football",
-            password_hash="demo_hash"
+            password_hash=security.hash_password("demo123")
         )
         db.add(athlete)
         perf = Performance(
@@ -139,6 +142,23 @@ def main():
     print(f"  Name                 : {athlete.name}")
     print(f"  Age / Category       : {athlete.age} / {athlete.category}")
     print(f"  Location             : {athlete.district}, {athlete.state}")
+    print(f"  Demo login password  : demo123")
+
+    # Seed a demo Scout / Official account so the official dashboard is usable out of the box.
+    official_email = "official@sai.gov.in"
+    official = db.query(Official).filter(Official.email == official_email).first()
+    if not official:
+        official = Official(
+            official_id="OFF-2026-000001",
+            name="SAI Talent Scout",
+            email=official_email,
+            organization="Sports Authority of India",
+            phone=None,
+            password_hash=security.hash_password("scout123"),
+        )
+        db.add(official)
+        db.commit()
+    print(f"  Demo Official login   : {official_email} / scout123")
 
     # Step 2: AI Camera Guidance Check
     print_header("Step 2: AI Camera Guidance Pre-Check (Section 8)")
@@ -167,12 +187,18 @@ def main():
     print(f"  Validation Score    : {vjump_verification['validation_score']}% ({vjump_verification['status']})")
     print(f"  Normalized Score    : {vjump_norm}/100 ({vjump_status})")
 
+    run_suffix = uuid.uuid4().hex[:6].upper()
+    vjump_ts = datetime.utcnow().replace(microsecond=0)
+    vjump_sig = cert_sig.sign_fields(
+        athlete_id, "vertical_jump", vjump_res["jump_height_cm"], vjump_norm,
+        vjump_verification["status"], vjump_ts,
+    )
     db.add(Assessment(
-        assessment_id="ASM-VJUMP-001", athlete_id=athlete_id, test_type="vertical_jump",
+        assessment_id=f"ASM-VJUMP-{run_suffix}", athlete_id=athlete_id, test_type="vertical_jump",
         raw_score=vjump_res["jump_height_cm"], normalized_score=vjump_norm,
         confidence=vjump_res["confidence"], validation_score=vjump_verification["validation_score"],
-        timestamp=datetime.utcnow(), status=vjump_verification["status"], sync_status="SYNCED",
-        details_json=json.dumps(vjump_res)
+        timestamp=vjump_ts, status=vjump_verification["status"], sync_status="SYNCED",
+        details_json=json.dumps({**vjump_res, cert_sig.SIGNATURE_KEY: vjump_sig})
     ))
 
     # Step 4: Sit-Ups Assessment (Section 10)
@@ -182,7 +208,7 @@ def main():
     situp_res = situp_analyzer.analyze_sequence(situp_seq, fps=30.0)
     situp_verification = AnomalyVerifier.verify_assessment(situp_seq, fps=30.0, test_specific_valid=situp_res["valid_reps"] > 0)
     situp_norm, situp_status, _ = BenchmarkingEngine.normalize_score(
-        situp_res["valid_reps"] * 8.0, "situp", athlete.age, athlete.category # scaled to 60s standard
+        situp_res["valid_reps"] * 8.0, "sit_up", athlete.age, athlete.category # scaled to 60s standard
     )
 
     print(f"  Total Reps Counted  : {situp_res['total_reps']}")
@@ -193,12 +219,18 @@ def main():
     print(f"  Validation Score    : {situp_verification['validation_score']}% ({situp_verification['status']})")
     print(f"  Normalized Score    : {situp_norm}/100 ({situp_status})")
 
+    situp_raw = situp_res["valid_reps"] * 8.0
+    situp_ts = datetime.utcnow().replace(microsecond=0)
+    situp_sig = cert_sig.sign_fields(
+        athlete_id, "sit_up", situp_raw, situp_norm,
+        situp_verification["status"], situp_ts,
+    )
     db.add(Assessment(
-        assessment_id="ASM-SITUP-001", athlete_id=athlete_id, test_type="sit_up",
-        raw_score=situp_res["valid_reps"] * 8.0, normalized_score=situp_norm,
+        assessment_id=f"ASM-SITUP-{run_suffix}", athlete_id=athlete_id, test_type="sit_up",
+        raw_score=situp_raw, normalized_score=situp_norm,
         confidence=situp_res["confidence"], validation_score=situp_verification["validation_score"],
-        timestamp=datetime.utcnow(), status=situp_verification["status"], sync_status="SYNCED",
-        details_json=json.dumps(situp_res)
+        timestamp=situp_ts, status=situp_verification["status"], sync_status="SYNCED",
+        details_json=json.dumps({**situp_res, cert_sig.SIGNATURE_KEY: situp_sig})
     ))
 
     # Step 5: Shuttle Run Assessment (Section 12)
@@ -218,12 +250,17 @@ def main():
     print(f"  Validation Score    : {shuttle_verification['validation_score']}% ({shuttle_verification['status']})")
     print(f"  Normalized Score    : {shuttle_norm}/100 ({shuttle_status})")
 
+    shuttle_ts = datetime.utcnow().replace(microsecond=0)
+    shuttle_sig = cert_sig.sign_fields(
+        athlete_id, "shuttle_run", shuttle_res["total_time_sec"], shuttle_norm,
+        shuttle_verification["status"], shuttle_ts,
+    )
     db.add(Assessment(
-        assessment_id="ASM-SHUTTLE-001", athlete_id=athlete_id, test_type="shuttle_run",
+        assessment_id=f"ASM-SHUTTLE-{run_suffix}", athlete_id=athlete_id, test_type="shuttle_run",
         raw_score=shuttle_res["total_time_sec"], normalized_score=shuttle_norm,
         confidence=shuttle_res["confidence"], validation_score=shuttle_verification["validation_score"],
-        timestamp=datetime.utcnow(), status=shuttle_verification["status"], sync_status="SYNCED",
-        details_json=json.dumps(shuttle_res)
+        timestamp=shuttle_ts, status=shuttle_verification["status"], sync_status="SYNCED",
+        details_json=json.dumps({**shuttle_res, cert_sig.SIGNATURE_KEY: shuttle_sig})
     ))
     db.commit()
 
@@ -238,6 +275,8 @@ def main():
     perf.strength_score = index_data["strength_score"]
     perf.power_score = index_data["power_score"]
     perf.endurance_score = index_data["endurance_score"]
+    perf.flexibility_score = index_data["flexibility_score"]
+    perf.body_composition_score = index_data["body_composition_score"]
     perf.overall_index = index_data["overall_index"]
     db.commit()
 
@@ -249,6 +288,9 @@ def main():
     print(f"  Strength Score            : {index_data['strength_score']}/100")
     print(f"  Explosive Power Score     : {index_data['power_score']}/100")
     print(f"  Endurance Score           : {index_data['endurance_score']}/100")
+    print(f"  Flexibility Score         : {index_data['flexibility_score']}/100")
+    print(f"  Body Composition Score    : {index_data['body_composition_score']}/100")
+    print(f"  Tests Completed           : {index_data['tests_completed']}")
     print(f"  --------------------------------------------------")
     print(f"  ATHLETIC PERFORMANCE INDEX: {index_data['overall_index']}/100")
     print(f"  Benchmark Reference Label : {bench_src}")
@@ -256,7 +298,7 @@ def main():
     # Step 7: Offline-First Sync Queue Verification (Section 18)
     print_header("Step 7: Offline-First SQLite Sync Engine Check (Section 18)")
     offline_asm = Assessment(
-        assessment_id="ASM-OFFLINE-099", athlete_id=athlete_id, test_type="vertical_jump",
+        assessment_id=f"ASM-OFFLINE-{run_suffix}", athlete_id=athlete_id, test_type="vertical_jump",
         raw_score=44.0, normalized_score=83.0, confidence=95.0, validation_score=97.0,
         timestamp=datetime.utcnow(), status="VALID", sync_status="PENDING"
     )

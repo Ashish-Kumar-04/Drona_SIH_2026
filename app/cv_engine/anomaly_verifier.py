@@ -121,3 +121,42 @@ class AnomalyVerifier:
             "status": str(status),
             "flags": [str(f) for f in flags]
         }
+
+    @staticmethod
+    def verify_manual_entry(test_type: str, raw_value: float, within_bounds: bool,
+                            officiated: bool = False) -> Dict[str, Any]:
+        """
+        Validation path for MANUAL / assisted-entry tests (50m dash, endurance run, sit & reach,
+        tape-measured broad jump). There is no pose video to analyse, so authenticity is judged
+        from plausibility bounds and whether an official recorded the result. This keeps the
+        pose-based checks (which require landmarks) from being applied to a value that has none.
+        """
+        flags = ["MANUAL_ENTRY"]
+        if not within_bounds:
+            return {
+                "athlete_detected": True,
+                "full_movement_detected": True,
+                "test_protocol_followed": False,
+                "recording_valid": False,
+                "authenticity_score": 0.0,
+                "validation_score": 0.0,
+                "status": "INVALID",
+                "flags": flags + ["VALUE_OUT_OF_PLAUSIBLE_RANGE"],
+            }
+        if officiated:
+            score, status = 90.0, "VALID"
+            flags.append("OFFICIATED")
+        else:
+            score, status = 75.0, "VALID"
+            flags.append("SELF_REPORTED")
+
+        return {
+            "athlete_detected": True,
+            "full_movement_detected": True,
+            "test_protocol_followed": True,
+            "recording_valid": True,
+            "authenticity_score": float(score),
+            "validation_score": float(score),
+            "status": status,
+            "flags": flags,
+        }
