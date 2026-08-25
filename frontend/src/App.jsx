@@ -167,11 +167,12 @@ export default function App() {
           <AuthScreen onAuthenticated={handleAuthenticated} t={t} />
         </main>
         <footer style={{
-          textAlign: 'center', padding: '18px', fontSize: '0.72rem',
+          textAlign: 'center', padding: '18px', fontSize: '0.90rem',
           color: 'var(--text-dim)', borderTop: '1px solid var(--border-glass)',
           background: 'var(--bg-footer)'
         }}>
-          National Sports Talent Assessment Platform • SIH 25073 • Powered by AI + MediaPipe
+          National Sports Talent Assessment Platform • Made With ❤️ By Team InnoVerse 
+                                 <center>&copy; All Rights Reserved</center>
         </footer>
       </div>
     );
@@ -193,11 +194,12 @@ export default function App() {
           <ScoutDashboard official={official} t={t} lang={lang} />
         </main>
         <footer style={{
-          textAlign: 'center', padding: '18px', fontSize: '0.72rem',
+          textAlign: 'center', padding: '18px', fontSize: '0.90rem',
           color: 'var(--text-dim)', borderTop: '1px solid var(--border-glass)',
           background: 'var(--bg-footer)'
         }}>
-          National Sports Talent Assessment Platform • SIH 25073 • Powered by AI + MediaPipe
+         National Sports Talent Assessment Platform • Made With ❤️ By Team InnoVerse 
+                                 <center>&copy; All Rights Reserved</center>
         </footer>
       </div>
     );
@@ -313,11 +315,12 @@ export default function App() {
       </main>
 
       <footer style={{
-        textAlign: 'center', padding: '18px', fontSize: '0.72rem',
+        textAlign: 'center', padding: '18px', fontSize: '0.90rem',
         color: 'var(--text-dim)', borderTop: '1px solid var(--border-glass)',
         background: 'var(--bg-footer)'
       }}>
-        National Sports Talent Assessment Platform • SIH 25073 • Powered by AI + MediaPipe
+        National Sports Talent Assessment Platform • Made With ❤️ By Team InnoVerse 
+                                 <center>&copy; All Rights Reserved</center>
       </footer>
     </div>
   );

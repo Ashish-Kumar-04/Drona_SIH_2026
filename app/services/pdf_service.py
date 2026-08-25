@@ -80,8 +80,8 @@ def generate_certificate_pdf(
 
     # ── Header ──
     top = PAGE_H - 40 * mm
-    _centered(c, "SAI TalentAI", cx, top, "Helvetica-Bold", 26, INK)
-    _centered(c, "Sports Authority of India  ·  AI Talent Assessment", cx, top - 16, "Helvetica", 10.5, MUTED)
+    _centered(c, "Drona-Sports Talent Assessment Platform", cx, top, "Helvetica-Bold", 26, INK)
+    _centered(c, "Sports Authority of India ", cx, top - 16, "Helvetica", 10.5, MUTED)
 
     # Accent rule
     c.setStrokeColorRGB(*ACCENT)

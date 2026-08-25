@@ -245,17 +245,17 @@ export default function AuthScreen({ onAuthenticated, t }) {
   const showRoleToggle = mode === 'login' || mode === 'register';
 
   const roleBtnStyle = (active) => ({
-    flex: 1, padding: '9px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+    flex: 1, padding: '9px 12px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
     fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center',
-    justifyContent: 'center', gap: '6px', transition: 'all 0.2s ease',
+    justifyContent: 'center', gap: '6px', transition: 'all 0.2s ease', whiteSpace: 'nowrap',
     border: active ? '1px solid var(--primary)' : '1px solid var(--border-glass)',
     background: active ? 'rgba(0, 242, 254, 0.12)' : 'transparent',
     color: active ? 'var(--primary)' : 'var(--text-muted)'
   });
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-      <div className="glass-panel" style={{ maxWidth: '520px', width: '100%', padding: '36px 32px' }}>
+    <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 0' }}>
+      <div className="glass-panel" style={{ maxWidth: '520px', width: '100%', padding: '36px 32px', boxSizing: 'border-box' }}>
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -270,19 +270,19 @@ export default function AuthScreen({ onAuthenticated, t }) {
             }} 
           />
           <h2 style={{ fontSize: '1.45rem', marginBottom: '4px' }}>
-            {mode === 'login' && (isOfficial ? 'Scout / Official Login' : 'Athlete Login')}
+            {mode === 'login' && (isOfficial ? 'Scout Login' : 'Athlete Login')}
             {mode === 'register' && (isOfficial ? 'Register Official Account' : 'New Athlete Registration')}
             {mode === 'forgot' && 'Reset Password'}
             {mode === 'otp_verify' && 'Verify OTP'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
             {mode === 'login' && (isOfficial
-              ? 'Access the talent discovery dashboard.'
+              ? 'Sign in to access the talent discovery dashboard.'
               : 'Sign in to access your sports profile and assessments.')}
             {mode === 'register' && (isOfficial
               ? 'For SAI scouts and officials (enrolment key required).'
               : 'Create your digital sports identity for talent discovery.')}
-            {mode === 'forgot' && 'Enter your Athlete ID to receive a reset OTP.'}
+            {mode === 'forgot' && 'Enter your ID or Email to receive a reset OTP.'}
             {mode === 'otp_verify' && 'Enter the OTP and set your new password.'}
           </p>
         </div>
@@ -348,15 +348,13 @@ export default function AuthScreen({ onAuthenticated, t }) {
               style={{ marginTop: '6px', padding: '14px', width: '100%', fontSize: '1rem' }}>
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
-              {!isOfficial && (
-                <button type="button" onClick={() => { setMode('forgot'); clearMessages(); }}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600 }}>
-                  Forgot Password?
-                </button>
-              )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', alignItems: 'center' }}>
+              <button type="button" onClick={() => { setMode('forgot'); clearMessages(); }}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600 }}>
+                Forgot Password?
+              </button>
               <button type="button" onClick={() => { setMode('register'); clearMessages(); }}
-                style={{ background: 'none', border: 'none', color: 'var(--accent-green)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600, marginLeft: 'auto' }}>
+                style={{ background: 'none', border: 'none', color: 'var(--accent-green)', fontSize: '0.82rem', cursor: 'pointer', fontWeight: 600 }}>
                 New? Register here
               </button>
             </div>
